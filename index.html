@@ -6,12 +6,12 @@
 
 <title>Vocabulary 2C1</title>
 
-<!-- PWA / Icons (cache-busting v=4) -->
-<link rel="manifest" href="manifest.webmanifest?v=4">
-<link rel="icon" href="icon-192.png?v=4" sizes="192x192">
-<link rel="icon" href="icon-512.png?v=4" sizes="512x512">
-<link rel="apple-touch-icon" href="icon-192.png?v=4">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=4">
+<!-- PWA / Icons (cache-busting v=6) -->
+<link rel="manifest" href="manifest.webmanifest?v=6">
+<link rel="icon" href="icon-192.png?v=6" sizes="192x192">
+<link rel="icon" href="icon-512.png?v=6" sizes="512x512">
+<link rel="apple-touch-icon" href="icon-192.png?v=6">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=6">
 <meta name="theme-color" content="#ffffff">
 
 <!-- iOS PWA -->
@@ -19,13 +19,21 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Vocabulary 2C1">
 
-<!-- SheetJS para leer Excel en el navegador -->
+<!-- SheetJS (leer Excel en navegador) -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
-  :root{--bg:#f6f7fb;--card:#fff;--text:#0a0a0a;--muted:#667;--soft:#eef1ff;--primary:#2f6df6;--okbg:#e7f6ec;--ok:#1b5e20;--okb:#b6e2c0;--kobg:#ffeaea;--ko:#b71c1c;--kob:#f5b5b5;--border:#e6e8f0}
+  :root{
+    --bg:#f6f7fb; --card:#fff; --text:#0a0a0a; --muted:#9aa3b2; /* más claro que antes */
+    --soft:#eef1ff; --primary:#2f6df6; --okbg:#e7f6ec; --ok:#1b5e20; --okb:#b6e2c0;
+    --kobg:#ffeaea; --ko:#b71c1c; --kob:#f5b5b5; --border:#e6e8f0
+  }
   @media (prefers-color-scheme: dark){
-    :root{--bg:#0e1116;--card:#121622;--text:#eaeef7;--muted:#a0a8b8;--soft:#1e2a48;--primary:#6da4ff;--okbg:#16331d;--ok:#a9e6b6;--okb:#214d2a;--kobg:#3a1818;--ko:#ffb0b0;--kob:#5a2727;--border:#263047}
+    :root{
+      --bg:#0e1116; --card:#121622; --text:#eaeef7; --muted:#92a0b6;
+      --soft:#1e2a48; --primary:#6da4ff; --okbg:#16331d; --ok:#a9e6b6; --okb:#214d2a;
+      --kobg:#3a1818; --ko:#ffb0b0; --kob:#5a2727; --border:#263047
+    }
   }
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -60,8 +68,6 @@
   .summary{background:transparent;border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:14px}
   .list{display:grid;grid-template-columns:1fr;gap:6px;max-height:260px;overflow:auto;padding:8px;border:1px dashed var(--border);border-radius:10px}
   .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--soft)}
-  .subtools{width:100%;display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
-  button.tiny{font-size:12px;padding:6px 10px}
   .welcome .content{display:grid;gap:14px}
   .welcome h2{margin:0;font-size:20px}
   .divider{height:1px;background:var(--border);margin:8px 0}
@@ -76,11 +82,7 @@
       <h1>Vocabulary 2C1</h1>
       <div class="row">
         <button class="ghost" id="btnReset">Reiniciar</button>
-        <div class="subtools">
-          <button class="tiny" id="btnExport">Exportar progreso</button>
-          <button class="tiny" id="btnImport">Importar progreso</button>
-          <input type="file" id="fileImport" accept="application/json" class="hidden">
-        </div>
+        <!-- Eliminados Exportar/Importar progreso -->
       </div>
     </div>
 
@@ -174,78 +176,96 @@
 </div>
 
 <script>
-/* ================== CARGA DE EXCEL Y PREPARACIÓN DE DATA ================== */
+/* ================== CARGA DE EXCEL (encabezados nuevos) ================== */
 let DATA = [];
 const FLEX_VARIANTS = {
   "dedo de la mano": ["dedo de la mano","dedo mano"],
   "dedos del pie": ["dedos del pie","dedos pie"],
   "uñas de los pies": ["uñas de los pies","uñas pies","uñas de los pie"]
 };
-
+function parseList(s){
+  if(!s) return [];
+  // divide por coma, punto y coma o barra; limpia y quita vacíos
+  return String(s).split(/[,;/]/).map(x=>x.trim()).filter(Boolean);
+}
 async function loadExcelToDATA() {
-  // Descarga el Excel desde la raíz del repo
-  const res = await fetch('Vocabulary.xlsx', { cache: 'no-store' });
-  if (!res.ok) throw new Error('No se pudo descargar Vocabulary.xlsx');
+  const url = 'Vocabulary con sinónimos y acepciones.xlsx';
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('No se pudo descargar el Excel: ' + url);
   const buf = await res.arrayBuffer();
 
-  // Lee con SheetJS
   const wb = XLSX.read(buf, { type: 'array' });
   const wsName = wb.SheetNames[0];
   const ws = wb.Sheets[wsName];
 
-  // Convierte a JSON de filas
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
   if (!rows.length) throw new Error('El Excel está vacío');
 
-  // Cabeceras y búsqueda de columnas
   const header = rows[0].map(h => String(h || '').trim());
-  function findCol(candidates, fallbackIndex) {
-    for (const cand of candidates) {
-      const idx = header.findIndex(h => h.toLowerCase() === cand.toLowerCase());
-      if (idx >= 0) return idx;
-    }
-    return Math.min(fallbackIndex, header.length - 1);
-  }
+  function idx(exact){ return header.findIndex(h => h.toLowerCase() === exact.toLowerCase()); }
+  function val(r,i){ return (r && i>=0 && i<r.length) ? String(r[i]||'').trim() : ''; }
 
-  const idxA = findCol(["English","Inglés","Ingles","EN","Word"], 0);
-  const idxB = findCol(["Part of speech","B","POS"], 1);
-  const idxC = findCol(["Pronunciation","C","IPA"], 2);
-  const idxD = findCol(["Example sentence","D","Sentence","Ejemplo"], 3);
-  const idxE = findCol(["Castellano","Español","Spanish","ES","Traducción"], 4);
-  const idxF = findCol(["File","Tema","Topic","Unidad"], 5);
+  // Encabezados exactos que me diste
+  const iA = idx('English');
+  const iB = idx('Sinónimos / expresiones equivalentes (English)');
+  const iC = idx('Acepciones adicionales (English)');
+  const iD = idx('Castellano');
+  const iE = idx('Sinónimos o expresiones equivalentes (en español)');
+  const iF = idx('Acepciones adicionales (en español)');
+  const iG = idx('Part of speech');
+  const iH = idx('Pronunciation');
+  const iI = idx('Example sentence');
+  const iJ = idx('File');
+  const iK = idx('Section');
 
-  // Construye DATA
   const out = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i] || [];
-    const en = String(r[idxA] || '').trim();
-    const es = String(r[idxE] || '').trim();
-    if (!en || !es) continue;
+  for (let r=1;r<rows.length;r++){
+    const row = rows[r] || [];
+    const en = val(row, iA);
+    const es = val(row, iD);
+    if(!en || !es) continue;
     out.push({
-      id: i-1,
+      id: r-1,
       english: en,
       spanish: es,
-      b: String(r[idxB] || '').trim(),
-      c: String(r[idxC] || '').trim(),
-      d: String(r[idxD] || '').trim(),
-      topic: String(r[idxF] || '').trim()
+      en_syn: val(row, iB),
+      en_mean: val(row, iC),
+      es_syn: val(row, iE),
+      es_mean: val(row, iF),
+      pos: val(row, iG),
+      pron: val(row, iH),
+      example: val(row, iI),
+      topic: val(row, iJ),
+      section: val(row, iK),
+      // Arrays preprocesados para corrección
+      en_syn_list: parseList(val(row, iB)),
+      es_syn_list: parseList(val(row, iE))
     });
   }
   DATA = out;
 }
+</script>
 
-/* ================== LÓGICA DE LA APP ================== */
+<script>
+/*** ================== LÓGICA DE LA APP ================== ***/
 function stripDiacritics(s){return s.normalize('NFD').replace(/\p{Diacritic}+/gu,'').replace(/ñ/g,'n').replace(/Ñ/g,'N')}
 function norm(s){return stripDiacritics(String(s||'').trim().toLowerCase()).replace(/\s+/g,' ')}
 function softNorm(s){return String(s||'').trim().toLowerCase().replace(/\s+/g,' ')}
-function buildAcceptableSet(spanish){const base=norm(spanish);const set=new Set([base]);const v=FLEX_VARIANTS[spanish?.toLowerCase()];if(v){for(const x of v)set.add(norm(x));}return set}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function keyFor(topic,mode,runMode,exam){return `vocab2c1::${topic}::${mode}::${runMode}::${exam?'exam':'normal'}`}
+
+function buildAcceptableSet(span){ // español con variantes flex + sinónimos ES
+  const base = norm(span);
+  const set = new Set([base]);
+  const v = FLEX_VARIANTS[span?.toLowerCase()];
+  if (v) for (const x of v) set.add(norm(x));
+  return set;
+}
 
 let TOPICS = [];
 const state={items:[], filtered:[], order:'random', mode:'es_en', runMode:'reiniciar', topic:'Todos', exam:false, queue:[], idx:0, seen:0, correct:0, hard:new Set(), phase:'answer', failedThisRound:new Set(), rightAll:new Set(), wrongAll:new Set()};
 
-function saveProgress(){const k=keyFor(state.topic,state.mode,state.runMode,state.exam); const queueIds=state.queue.map(i=>state.filtered[i]?.id).filter(v=>v!==undefined); const payload={version:2, filteredIds:state.filtered.map(it=>it.id), queueIds, idx:state.idx, seen:state.seen, correct:state.correct, failedThisRound:[...state.failedThisRound], rightAll:[...state.rightAll], wrongAll:[...state.wrongAll], hard:[...state.hard], order:state.order, phase:state.phase}; try{localStorage.setItem(k,JSON.stringify(payload))}catch(e){}}
+function saveProgress(){const k=keyFor(state.topic,state.mode,state.runMode,state.exam); const queueIds=state.queue.map(i=>state.filtered[i]?.id).filter(v=>v!==undefined); const payload={version:4, filteredIds:state.filtered.map(it=>it.id), queueIds, idx:state.idx, seen:state.seen, correct:state.correct, failedThisRound:[...state.failedThisRound], rightAll:[...state.rightAll], wrongAll:[...state.wrongAll], hard:[...state.hard], order:state.order, phase:state.phase}; try{localStorage.setItem(k,JSON.stringify(payload))}catch(e){}}
 function loadProgress(){const k=keyFor(state.topic,state.mode,state.runMode,state.exam); let raw=null; try{raw=localStorage.getItem(k)}catch(e){raw=null} if(!raw)return false; let data=null; try{data=JSON.parse(raw)}catch(e){return false} const curr=new Set(state.filtered.map(it=>it.id)); const saved=new Set((data.filteredIds||[])); if(curr.size!==saved.size)return false; for(const id of curr){if(!saved.has(id))return false} const idToIdx=new Map(state.filtered.map((it,i)=>[it.id,i])); const rebuilt=(data.queueIds||[]).map(id=>idToIdx.get(id)).filter(i=>i!==undefined); if(!rebuilt.length)return false; state.queue=rebuilt; state.idx=Math.min(Math.max(0,data.idx||0),state.queue.length-1); state.seen=data.seen||0; state.correct=data.correct||0; state.failedThisRound=new Set(data.failedThisRound||[]); state.rightAll=new Set(data.rightAll||[]); state.wrongAll=new Set(data.wrongAll||[]); state.hard=new Set(data.hard||[]); state.order=data.order||state.order; state.phase='answer'; return true;}
 function clearProgress(){const k=keyFor(state.topic,state.mode,state.runMode,state.exam); try{localStorage.removeItem(k)}catch(e){}}
 
@@ -257,21 +277,140 @@ function buildQueue(){const idxs=state.filtered.map((_,i)=>i); state.queue=(stat
 function currentItem(){const i=state.queue[state.idx]??0; return state.filtered[i]}
 function percent(){if(!state.queue.length)return 0; return Math.round(((state.idx)/state.queue.length)*100)}
 function updateProgressUI(){document.getElementById('progressBar').style.width=percent()+'%'; document.getElementById('stats').textContent=`Aciertos: ${state.correct} · Intentos: ${state.seen} · Tema: ${state.topic} · ${state.idx+1}/${state.queue.length}`}
-function renderExtraInfo(it){const parts=[]; if(it.d) parts.push(`<div><b>Example sentence:</b> ${it.d}</div>`); if(it.c) parts.push(`<div><b>C:</b> ${it.c}</div>`); if(it.b) parts.push(`<div><b>B:</b> ${it.b}</div>`); return parts.join('')||'<div class="muted">Sin información adicional.</div>'}
-function toggleReviewUI(on){document.getElementById('btnNext').classList.toggle('hidden',!on); ['btnCheck','btnReveal','btnSkip','btnHard','answer'].forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=on})}
-function clearExtraAndFeedback(){document.getElementById('extraInfo').innerHTML=''; document.getElementById('feedback').innerHTML=''; toggleReviewUI(false); clearBanner('banner')}
-function updateUI(reset=false){const it=currentItem(); if(!it){document.getElementById('prompt').textContent='(Sin datos)'; return} document.getElementById('prompt').textContent=(state.mode==='es_en')?it.spanish:it.english; if(reset) document.getElementById('answer').value=''; document.getElementById('chips').innerHTML=''; clearExtraAndFeedback(); updateProgressUI(); document.getElementById('answer').focus()}
+
+function renderChips(it){
+  const chips=[];
+  if(it.topic) chips.push(`<span class="chip">${it.topic}</span>`);
+  if(it.section) chips.push(`<span class="chip">${it.section}</span>`);
+  return chips.join('');
+}
+function renderExtraInfo(it){
+  const lines=[];
+  if(it.example) lines.push(`<div><b>Example sentence:</b> ${it.example}</div>`);
+  if(it.pron)    lines.push(`<div><b>Pronunciation:</b> ${it.pron}</div>`);
+  if(it.pos)     lines.push(`<div><b>Part of speech:</b> ${it.pos}</div>`);
+  if(it.en_syn)  lines.push(`<div><b>Synonyms (EN):</b> ${it.en_syn}</div>`);
+  if(it.en_mean) lines.push(`<div><b>Additional meanings (EN):</b> ${it.en_mean}</div>`);
+  if(it.es_syn)  lines.push(`<div><b>Sinónimos (ES):</b> ${it.es_syn}</div>`);
+  if(it.es_mean) lines.push(`<div><b>Acepciones (ES):</b> ${it.es_mean}</div>`);
+  return lines.join('') || '<div class="muted">Sin información adicional.</div>';
+}
+function toggleReviewUI(on){
+  document.getElementById('btnNext').classList.toggle('hidden',!on);
+  ['btnCheck','btnReveal','btnSkip','btnHard','answer'].forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=on});
+}
+function clearExtraAndFeedback(){
+  document.getElementById('extraInfo').innerHTML='';
+  document.getElementById('feedback').innerHTML='';
+  document.getElementById('chips').innerHTML='';
+  toggleReviewUI(false);
+  clearBanner('banner');
+}
+function updateUI(reset=false){
+  const it=currentItem(); if(!it){document.getElementById('prompt').textContent='(Sin datos)'; return}
+  document.getElementById('prompt').textContent=(state.mode==='es_en')?it.spanish:it.english;
+  if(reset) document.getElementById('answer').value='';
+  document.getElementById('chips').innerHTML = renderChips(it);
+  clearExtraAndFeedback();
+  updateProgressUI();
+  document.getElementById('answer').focus();
+}
+
+/* ======= Corrección: principal + SINÓNIMOS ======= */
+function acceptableEnglishSet(it){
+  // En es_en, la respuesta esperada es en EN (main + en_syn_list)
+  const set = new Set([softNorm(it.english)]);
+  for(const s of (it.en_syn_list||[])) set.add(softNorm(s));
+  return set;
+}
+function acceptableSpanishSet(it){
+  // En en_es, respuesta esperada es ES (main + es_syn_list) con tolerancia á/acento
+  const set = buildAcceptableSet(it.spanish);
+  for(const s of (it.es_syn_list||[])) set.add(norm(s));
+  return set;
+}
 
 function gotoNext(){state.idx++; if(state.idx>=state.queue.length){handleEndOfCycle(); return} state.phase='answer'; updateUI(true); saveProgress()}
-function handleEndOfCycle(){if(state.runMode==='reiniciar'){const failed=[...state.failedThisRound]; state.failedThisRound.clear(); if(failed.length>0){const map=new Map(state.filtered.map((it,idx)=>[it.id,idx])); const nextIdxs=failed.map(id=>map.get(id)).filter(i=>i!==undefined); state.queue=(state.order==='random')?shuffle(nextIdxs):nextIdxs; state.idx=0; state.phase='answer'; updateUI(true); saveProgress(); return}} showSummary(); saveProgress()}
-function showSummary(){state.phase='summary'; document.getElementById('btnNext').classList.add('hidden'); ['btnCheck','btnReveal','btnSkip','btnHard','answer'].forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=true}); const sum=document.getElementById('summary'); const sumCounts=document.getElementById('sumCounts'); const sumRight=document.getElementById('sumRight'); const sumWrong=document.getElementById('sumWrong'); const right=[...state.rightAll], wrong=[...state.wrongAll]; const map=new Map(state.items.map(it=>[it.id,it])); sumCounts.textContent=`Aciertos: ${state.correct} · Intentos: ${state.seen} · Tema: ${state.topic} · Palabras: ${state.filtered.length}`; function render(ids){return ids.map(id=>{const it=map.get(id); if(!it) return ''; const shown=(state.mode==='es_en')?`${it.spanish} → ${it.english}`:`${it.english} → ${it.spanish}`; return `<div><span class='pill'>${shown}</span></div>`}).join('')} sumRight.innerHTML=render(right); sumWrong.innerHTML=render(wrong); sum.classList.remove('hidden')}
+function handleEndOfCycle(){
+  if(state.runMode==='reiniciar'){
+    const failed=[...state.failedThisRound]; state.failedThisRound.clear();
+    if(failed.length>0){
+      const map=new Map(state.filtered.map((it,idx)=>[it.id,idx]));
+      const nextIdxs=failed.map(id=>map.get(id)).filter(i=>i!==undefined);
+      state.queue=(state.order==='random')?shuffle(nextIdxs):nextIdxs;
+      state.idx=0; state.phase='answer'; updateUI(true); saveProgress(); return;
+    }
+  }
+  showSummary(); saveProgress();
+}
+function showSummary(){
+  state.phase='summary';
+  document.getElementById('btnNext').classList.add('hidden');
+  ['btnCheck','btnReveal','btnSkip','btnHard','answer'].forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=true});
+  const sum=document.getElementById('summary'); const sumCounts=document.getElementById('sumCounts');
+  const sumRight=document.getElementById('sumRight'); const sumWrong=document.getElementById('sumWrong');
+  const right=[...state.rightAll], wrong=[...state.wrongAll];
+  const map=new Map(state.items.map(it=>[it.id,it]));
+  sumCounts.textContent=`Aciertos: ${state.correct} · Intentos: ${state.seen} · Tema: ${state.topic} · Palabras: ${state.filtered.length}`;
+  function render(ids){
+    return ids.map(id=>{
+      const it=map.get(id); if(!it) return '';
+      const shown=(state.mode==='es_en')?`${it.spanish} → ${it.english}`:`${it.english} → ${it.spanish}`;
+      return `<div><span class='pill'>${shown}</span></div>`;
+    }).join('');
+  }
+  sumRight.innerHTML=render(right);
+  sumWrong.innerHTML=render(wrong);
+  sum.classList.remove('hidden');
+}
 
-function showSolutionAndInfo(it, solutionText, note=''){const fb=document.getElementById('feedback'); const ex=document.getElementById('extraInfo'); const noteHtml=note?` <span class='muted'>(${note})</span>`:''; fb.innerHTML='Solución: <b>'+solutionText+'</b>'+noteHtml; ex.innerHTML=renderExtraInfo(it); state.phase='review'; toggleReviewUI(true); saveProgress()}
-function check(){if(state.phase!=='answer') return; const it=currentItem(); if(!it) return; let userRaw=String(document.getElementById('answer').value||''); userRaw=userRaw.trimEnd(); const userSoft=softNorm(userRaw), userHard=norm(userRaw); let ok=false, solution='', accentsIgnored=false; if(state.mode==='es_en'){solution=it.english; ok=(userSoft===softNorm(it.english))} else {solution=it.spanish; const acceptable=buildAcceptableSet(it.spanish); if(acceptable.has(userHard)){ok=true; if(!acceptable.has(userSoft)) accentsIgnored=true}} state.seen++; if(ok){state.correct++; state.rightAll.add(it.id); state.wrongAll.delete(it.id); setBanner('banner','Acierto. ¡Muy bien!',true)} else {state.failedThisRound.add(it.id); state.wrongAll.add(it.id); state.rightAll.delete(it.id); setBanner('banner','Fallo. ¡Revisa tu respuesta!',false)} const note=(accentsIgnored && state.mode==='en_es')?'Se han ignorado los acentos en español':''; showSolutionAndInfo(it,solution,note)}
-function reveal(){if(state.phase!=='answer') return; const it=currentItem(); if(!it) return; const sol=(state.mode==='es_en')?it.english:it.spanish; setBanner('banner','Mostrada la solución de esta tarjeta.',false); showSolutionAndInfo(it,sol)}
-function skip(){if(state.phase!=='answer') return; const it=currentItem(); if(!it) return; const sol=(state.mode==='es_en')?it.english:it.spanish; setBanner('banner','Mostrada la solución de esta tarjeta.',false); showSolutionAndInfo(it,sol)}
-function markHard(){if(state.phase!=='answer') return; const it=currentItem(); if(!it) return; const from=(state.mode==='es_en')?it.spanish:it.english; const key=from.toLowerCase(); if(state.hard.has(key)) state.hard.delete(key); else state.hard.add(key); const sol=(state.mode==='es_en')?it.english:it.spanish; setBanner('banner','Marcada como difícil. Revisa y continúa cuando quieras.',false); showSolutionAndInfo(it,sol)}
+function showSolutionAndInfo(it, solutionText, note=''){
+  const fb=document.getElementById('feedback');
+  const ex=document.getElementById('extraInfo');
+  const noteHtml=note?` <span class='muted'>(${note})</span>`:'';
+  fb.innerHTML='Solución: <b>'+solutionText+'</b>'+noteHtml;
+  ex.innerHTML=renderExtraInfo(it);
+  state.phase='review';
+  toggleReviewUI(true);
+  saveProgress();
+}
 
+function check(){
+  if(state.phase!=='answer') return;
+  const it=currentItem(); if(!it) return;
+
+  let userRaw=String(document.getElementById('answer').value||'');
+  userRaw=userRaw.trimEnd();
+  const userSoft=softNorm(userRaw);   // respeta acentos (para EN); minúsculas/espacios ok
+  const userHard=norm(userRaw);       // sin acentos (para ES)
+
+  let ok=false, solution='', accentsIgnored=false;
+
+  if(state.mode==='es_en'){
+    // Respuesta esperada en INGLÉS: principal + sinónimos EN (softNorm)
+    solution = it.english;
+    const acc = acceptableEnglishSet(it);
+    ok = acc.has(userSoft);
+  }else{
+    // Respuesta esperada en ESPAÑOL: principal + sinónimos ES (norm)
+    solution = it.spanish;
+    const acc = acceptableSpanishSet(it);
+    if(acc.has(userHard)){ ok=true; if(!acc.has(userSoft)) accentsIgnored=true; }
+  }
+
+  state.seen++;
+  if(ok){ state.correct++; state.rightAll.add(it.id); state.wrongAll.delete(it.id); setBanner('banner','Acierto. ¡Muy bien!',true); }
+  else { state.failedThisRound.add(it.id); state.wrongAll.add(it.id); state.rightAll.delete(it.id); setBanner('banner','Fallo. ¡Revisa tu respuesta!',false); }
+
+  const note=(accentsIgnored && state.mode==='en_es')?'Se han ignorado los acentos en español':'';
+  showSolutionAndInfo(it, solution, note);
+}
+
+function reveal(){ if(state.phase!=='answer') return; const it=currentItem(); if(!it) return; const sol=(state.mode==='es_en')?it.english:it.spanish; setBanner('banner','Mostrada la solución de esta tarjeta.',false); showSolutionAndInfo(it,sol) }
+function skip(){ if(state.phase!=='answer') return; const it=currentItem(); if(!it) return; const sol=(state.mode==='es_en')?it.english:it.spanish; setBanner('banner','Mostrada la solución de esta tarjeta.',false); showSolutionAndInfo(it,sol) }
+function markHard(){ if(state.phase!=='answer') return; const it=currentItem(); if(!it) return; const from=(state.mode==='es_en')?it.spanish:it.english; const key=from.toLowerCase(); if(state.hard.has(key)) state.hard.delete(key); else state.hard.add(key); const sol=(state.mode==='es_en')?it.english:it.spanish; setBanner('banner','Marcada como difícil. Revisa y continúa cuando quieras.',false); showSolutionAndInfo(it,sol) }
+
+/* ======= Eventos UI ======= */
 document.getElementById('btnCheck').addEventListener('click',check);
 document.getElementById('btnReveal').addEventListener('click',reveal);
 document.getElementById('btnSkip').addEventListener('click',skip);
@@ -279,19 +418,35 @@ document.getElementById('btnHard').addEventListener('click',markHard);
 document.getElementById('btnNext').addEventListener('click',gotoNext);
 document.getElementById('sumRestart').addEventListener('click',()=>{ goWelcome(true) });
 
-document.getElementById('btnExport').addEventListener('click',exportAllProgress);
-document.getElementById('btnImport').addEventListener('click',()=>document.getElementById('fileImport').click());
-document.getElementById('fileImport').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0]; if(f) importAllProgressFromFile(f); e.target.value=''});
-
 document.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ if(viewIsQuiz() && state.phase==='answer') check(); else if(viewIsQuiz() && state.phase==='review') gotoNext(); }});
 document.getElementById('btnReset').addEventListener('click',()=>goWelcome(false));
 
-function exportAllProgress(){const prefix='vocab2c1::'; const dump={}; for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k&&k.startsWith(prefix)) dump[k]=localStorage.getItem(k)} const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'}); const a=document.createElement('a'); const date=new Date().toISOString().slice(0,10); a.href=URL.createObjectURL(blob); a.download=`vocabulary_2c1_progreso_${date}.json`; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove()},0); setBanner('banner','Progreso exportado a JSON.',true)}
-function importAllProgressFromFile(file){const reader=new FileReader(); reader.onload=e=>{try{const obj=JSON.parse(String(e.target.result||'{}')); const prefix='vocab2c1::'; let count=0; for(const [k,v] of Object.entries(obj)){ if(String(k).startsWith(prefix)&&typeof v==='string'){ try{localStorage.setItem(k,v); count++}catch(e){} }} setBanner('bannerWelcome',`Importación completada (${count} claves).`,true); document.getElementById('resumeBox').classList.remove('hidden')}catch(err){ setBanner('bannerWelcome','Archivo inválido. Selecciona el JSON exportado.',false) }}; reader.readAsText(file)}
-
 function viewIsQuiz(){ return !document.getElementById('quizView').classList.contains('hidden') }
 function goWelcome(hard){ if(hard){clearProgress()} document.getElementById('welcomeView').classList.remove('hidden'); document.getElementById('quizView').classList.add('hidden'); configureTopics('w_topic'); const hasSaved=Object.keys(localStorage).some(k=>k.startsWith('vocab2c1::')); document.getElementById('resumeBox').classList.toggle('hidden', !hasSaved); clearBanner('banner'); clearBanner('bannerWelcome') }
-function startFromWelcome(resume){ state.mode=document.getElementById('w_mode').value; state.order=document.getElementById('w_order').value; state.topic=document.getElementById('w_topic').value||'Todos'; state.runMode=document.getElementById('w_runMode').value; state.exam=document.getElementById('w_exam').checked; applyFilter(); buildQueue(); let loaded=false; if(resume){loaded=loadProgress()} if(!loaded){state.idx=0; state.seen=0; state.correct=0; state.failedThisRound.clear(); state.rightAll.clear(); state.wrongAll.clear()} document.getElementById('welcomeView').classList.add('hidden'); document.getElementById('quizView').classList.remove('hidden'); document.getElementById('btnReveal').classList.toggle('hidden', state.exam); document.getElementById('btnSkip').classList.toggle('hidden', state.exam); document.getElementById('btnHard').classList.toggle('hidden', state.exam); state.phase='answer'; updateUI(true); saveProgress() }
+function startFromWelcome(resume){
+  state.mode=document.getElementById('w_mode').value;
+  state.order=document.getElementById('w_order').value;
+  state.topic=document.getElementById('w_topic').value||'Todos';
+  state.runMode=document.getElementById('w_runMode').value;
+  state.exam=document.getElementById('w_exam').checked;
+
+  applyFilter(); buildQueue();
+
+  let loaded=false; if(resume){loaded=loadProgress()}
+  if(!loaded){
+    state.idx=0; state.seen=0; state.correct=0;
+    state.failedThisRound.clear(); state.rightAll.clear(); state.wrongAll.clear();
+  }
+
+  document.getElementById('welcomeView').classList.add('hidden');
+  document.getElementById('quizView').classList.remove('hidden');
+
+  document.getElementById('btnReveal').classList.toggle('hidden', state.exam);
+  document.getElementById('btnSkip').classList.toggle('hidden', state.exam);
+  document.getElementById('btnHard').classList.toggle('hidden', state.exam);
+
+  state.phase='answer'; updateUI(true); saveProgress();
+}
 
 function configureTopics(selId){
   TOPICS = ['Todos', ...Array.from(new Set((DATA||[]).map(x=>x.topic||'').filter(x=>x && x.trim()!=='')))];
@@ -301,28 +456,26 @@ function configureTopics(selId){
 
 /* ============== INICIO ============== */
 (async function init(){
-  // 1) Cargar Excel -> DATA
   try{
     await loadExcelToDATA();
   }catch(err){
     console.error(err);
-    setBanner('bannerWelcome','No se pudo cargar Vocabulary.xlsx. Asegúrate de subirlo a la raíz del repo.', false);
+    setBanner('bannerWelcome','No se pudo cargar el Excel. Asegúrate de subirlo junto a index.html con el nombre exacto.', false);
   }
   state.items = (DATA || []).slice();
 
-  // 2) Preparar bienvenida
   configureTopics('w_topic');
   document.getElementById('btnStart').addEventListener('click', ()=>startFromWelcome(false));
   document.getElementById('btnResume').addEventListener('click', ()=>startFromWelcome(true));
 
-  // Si hay progreso previo, preselecciona con heurística básica (toma primer perfil guardado)
+  // Heurística sencilla para precargar combos con último perfil
   let lastKey=null;
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(k && k.startsWith('vocab2c1::')){ lastKey=k; break; }
   }
   if(lastKey){
-    const parts=lastKey.split('::'); // vocab2c1::topic::mode::runMode::(exam|normal)
+    const parts=lastKey.split('::');
     if(parts.length>=5){
       const [_p,topic,mode,run,examTag]=parts;
       if(TOPICS.includes(topic)) document.getElementById('w_topic').value=topic;
@@ -332,8 +485,6 @@ function configureTopics(selId){
       document.getElementById('resumeBox').classList.remove('hidden');
     }
   }
-
-  // 3) Mostrar vista bienvenida
   goWelcome(false);
 })();
 </script>
